@@ -6,7 +6,7 @@ import type { LicenceProperties } from "../types";
 import { FACTMAPS_MAPSERVER } from "../api/sodirClient";
 import { CONTEXT_LAYERS } from "../layers";
 import { buildFilterExpression, type Filters } from "../filterExpression";
-import { UNKNOWN_OPERATOR_COLOR } from "../companyColors";
+import { OVERLAP_COLOR, UNKNOWN_OPERATOR_COLOR } from "../companyColors";
 import type { ColorMode } from "../types";
 
 const LICENCE_SOURCE = "licences";
@@ -86,8 +86,38 @@ function refreshContextLayer(map: MLMap, layerId: string, layerIds: string) {
 
 const STATUS_COLOR_EXPRESSION = ["case", ["==", ["get", "active"], "Y"], "#1f7a8c", "#8a8a8a"];
 
-function colorExpression(colorMode: ColorMode, operatorColors: Map<string, string>): unknown {
+/**
+ * "licensee" mode colours by whichever companies are currently selected in
+ * the Company filter — one colour each, plus a distinct OVERLAP_COLOR for
+ * any licence held by 2+ of them. Independent of the actual filter (which
+ * only controls what's shown); this only affects colour, so it stays useful
+ * even before/without applying that filter to visibility.
+ */
+function licenseeColorExpression(selectedCompanies: string[], licenseeColors: Map<string, string>): unknown {
+  if (selectedCompanies.length === 0) return UNKNOWN_OPERATOR_COLOR;
+  const matchCount = [
+    "+",
+    ...selectedCompanies.map((c) => ["case", ["in", c, ["get", "licenseeNames"]], 1, 0]),
+  ];
+  const singleCompanyColor = [
+    "case",
+    ...selectedCompanies.flatMap((c) => [
+      ["in", c, ["get", "licenseeNames"]],
+      licenseeColors.get(c) ?? UNKNOWN_OPERATOR_COLOR,
+    ]),
+    UNKNOWN_OPERATOR_COLOR,
+  ];
+  return ["case", [">=", matchCount, 2], OVERLAP_COLOR, ["==", matchCount, 1], singleCompanyColor, UNKNOWN_OPERATOR_COLOR];
+}
+
+function colorExpression(
+  colorMode: ColorMode,
+  operatorColors: Map<string, string>,
+  licenseeColors: Map<string, string>,
+  selectedCompanies: string[],
+): unknown {
   if (colorMode === "status") return STATUS_COLOR_EXPRESSION;
+  if (colorMode === "licensee") return licenseeColorExpression(selectedCompanies, licenseeColors);
   if (operatorColors.size === 0) return UNKNOWN_OPERATOR_COLOR;
   const pairs = [...operatorColors.entries()].flat();
   return ["match", ["get", "operatorName"], ...pairs, UNKNOWN_OPERATOR_COLOR];
@@ -134,9 +164,17 @@ interface Props {
   activeContextLayers: Set<string>;
   colorMode: ColorMode;
   operatorColors: Map<string, string>;
+  licenseeColors: Map<string, string>;
 }
 
-export function MapView({ licences, filters, activeContextLayers, colorMode, operatorColors }: Props) {
+export function MapView({
+  licences,
+  filters,
+  activeContextLayers,
+  colorMode,
+  operatorColors,
+  licenseeColors,
+}: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MLMap | null>(null);
   const popupRef = useRef<Popup | null>(null);
@@ -147,6 +185,10 @@ export function MapView({ licences, filters, activeContextLayers, colorMode, ope
   colorModeRef.current = colorMode;
   const operatorColorsRef = useRef(operatorColors);
   operatorColorsRef.current = operatorColors;
+  const licenseeColorsRef = useRef(licenseeColors);
+  licenseeColorsRef.current = licenseeColors;
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -193,7 +235,12 @@ export function MapView({ licences, filters, activeContextLayers, colorMode, ope
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
       });
-      const initialColor = colorExpression(colorModeRef.current, operatorColorsRef.current);
+      const initialColor = colorExpression(
+        colorModeRef.current,
+        operatorColorsRef.current,
+        licenseeColorsRef.current,
+        filtersRef.current.companies,
+      );
       map.addLayer({
         id: LICENCE_FILL_LAYER,
         type: "fill",
@@ -259,14 +306,14 @@ export function MapView({ licences, filters, activeContextLayers, colorMode, ope
     else map.once("load", apply);
   }, [licences]);
 
-  // Recolor licences by status or by operator.
+  // Recolor licences by status, operator, or selected-licensee overlap.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
-    const expr = colorExpression(colorMode, operatorColors);
+    const expr = colorExpression(colorMode, operatorColors, licenseeColors, filters.companies);
     map.setPaintProperty(LICENCE_FILL_LAYER, "fill-color", expr as any);
     map.setPaintProperty(LICENCE_LINE_LAYER, "line-color", expr as any);
-  }, [colorMode, operatorColors]);
+  }, [colorMode, operatorColors, licenseeColors, filters.companies]);
 
   // Apply attribute filters.
   useEffect(() => {

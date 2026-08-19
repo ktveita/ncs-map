@@ -10,3 +10,6 @@ export function buildCompanyColors(companies: string[]): Map<string, string> {
 }
 
 export const UNKNOWN_OPERATOR_COLOR = "#999999";
+
+/** Colour for a licence held by 2+ of the companies currently selected in the licensee-colour mode. */
+export const OVERLAP_COLOR = "#1a1a1a";

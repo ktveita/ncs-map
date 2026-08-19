@@ -1,6 +1,7 @@
 import { MultiSelect } from "./MultiSelect";
 import { CONTEXT_LAYERS } from "../layers";
 import { EMPTY_FILTERS, hasActiveFilters, type Filters } from "../filterExpression";
+import { OVERLAP_COLOR } from "../companyColors";
 import type { ColorMode } from "../types";
 
 interface Facets {
@@ -23,6 +24,7 @@ interface Props {
   colorMode: ColorMode;
   onColorModeChange: (mode: ColorMode) => void;
   operatorColors: Map<string, string>;
+  licenseeColors: Map<string, string>;
 }
 
 export function Sidebar({
@@ -38,6 +40,7 @@ export function Sidebar({
   colorMode,
   onColorModeChange,
   operatorColors,
+  licenseeColors,
 }: Props) {
   const grouped = CONTEXT_LAYERS.reduce<Record<string, typeof CONTEXT_LAYERS>>((acc, l) => {
     (acc[l.group] ??= []).push(l);
@@ -80,6 +83,13 @@ export function Sidebar({
           >
             Operator
           </button>
+          <button
+            type="button"
+            className={colorMode === "licensee" ? "segmented-btn active" : "segmented-btn"}
+            onClick={() => onColorModeChange("licensee")}
+          >
+            Licensee
+          </button>
         </div>
         {colorMode === "operator" && (
           <div className="legend">
@@ -91,6 +101,25 @@ export function Sidebar({
             ))}
           </div>
         )}
+        {colorMode === "licensee" &&
+          (filters.companies.length === 0 ? (
+            <p className="hint">Select companies in the Company filter below to colour by licensee.</p>
+          ) : (
+            <div className="legend">
+              {filters.companies.map((company) => (
+                <div className="legend-row" key={company}>
+                  <span className="legend-swatch" style={{ background: licenseeColors.get(company) }} />
+                  <span className="legend-label">{company}</span>
+                </div>
+              ))}
+              {filters.companies.length > 1 && (
+                <div className="legend-row">
+                  <span className="legend-swatch" style={{ background: OVERLAP_COLOR }} />
+                  <span className="legend-label">2+ selected companies (overlap)</span>
+                </div>
+              )}
+            </div>
+          ))}
       </section>
 
       <section className="sidebar-section">

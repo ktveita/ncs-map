@@ -22,7 +22,7 @@ export interface LicenceProperties {
   licensees: Licensee[];
 }
 
-export type ColorMode = "status" | "operator";
+export type ColorMode = "status" | "operator" | "licensee";
 
 export interface LayerDef {
   id: string;

@@ -18,6 +18,7 @@ function App() {
   );
 
   const operatorColors = useMemo(() => buildCompanyColors(facets.companies), [facets.companies]);
+  const licenseeColors = useMemo(() => buildCompanyColors(filters.companies), [filters.companies]);
 
   const matchCount = useMemo(() => {
     if (!data) return null;
@@ -48,6 +49,7 @@ function App() {
         colorMode={colorMode}
         onColorModeChange={setColorMode}
         operatorColors={operatorColors}
+        licenseeColors={licenseeColors}
       />
       <MapView
         licences={data}
@@ -55,6 +57,7 @@ function App() {
         activeContextLayers={activeContextLayers}
         colorMode={colorMode}
         operatorColors={operatorColors}
+        licenseeColors={licenseeColors}
       />
     </div>
   );
