@@ -12,6 +12,17 @@ const LICENCE_FILL_LAYER = "licences-fill";
 const LICENCE_LINE_LAYER = "licences-line";
 const LICENCE_HIGHLIGHT_LAYER = "licences-highlight";
 
+/**
+ * MapLibre processes GeoJSON sources in a web worker (loaded from a separate
+ * "maplibre-gl-worker.mjs" chunk it locates at runtime). Vite's production
+ * build doesn't statically detect that reference, so no worker chunk gets
+ * emitted — the source silently never finishes tiling and nothing renders.
+ * Pointing at a copy in public/ (copied from node_modules by
+ * scripts/copy-maplibre-worker.mjs, run via the predev/prebuild npm hooks)
+ * sidesteps the auto-detection entirely.
+ */
+maplibregl.setWorkerUrl(`${import.meta.env.BASE_URL}maplibre-gl-worker.mjs`);
+
 const MERCATOR_R = 6378137;
 
 /** Web Mercator (EPSG:3857) x/y for a [lng, lat] pair. */
@@ -153,6 +164,7 @@ export function MapView({ licences, filters, activeContextLayers }: Props) {
       // Context layers: one whole-viewport image per active layer, refetched on moveend.
       for (const layer of CONTEXT_LAYERS) {
         refreshContextLayer(map, layer.id, layer.layerIds);
+        map.setLayoutProperty(layer.id, "visibility", activeContextLayersRef.current.has(layer.id) ? "visible" : "none");
       }
       map.on("moveend", () => {
         for (const layer of CONTEXT_LAYERS) {
