@@ -1,6 +1,7 @@
 import { MultiSelect } from "./MultiSelect";
 import { CONTEXT_LAYERS } from "../layers";
 import { EMPTY_FILTERS, hasActiveFilters, type Filters } from "../filterExpression";
+import type { ColorMode } from "../types";
 
 interface Facets {
   companies: string[];
@@ -19,6 +20,9 @@ interface Props {
   onFiltersChange: (f: Filters) => void;
   activeContextLayers: Set<string>;
   onToggleContextLayer: (id: string) => void;
+  colorMode: ColorMode;
+  onColorModeChange: (mode: ColorMode) => void;
+  operatorColors: Map<string, string>;
 }
 
 export function Sidebar({
@@ -31,6 +35,9 @@ export function Sidebar({
   onFiltersChange,
   activeContextLayers,
   onToggleContextLayer,
+  colorMode,
+  onColorModeChange,
+  operatorColors,
 }: Props) {
   const grouped = CONTEXT_LAYERS.reduce<Record<string, typeof CONTEXT_LAYERS>>((acc, l) => {
     (acc[l.group] ??= []).push(l);
@@ -54,6 +61,36 @@ export function Sidebar({
             </span>
           )}
         </div>
+      </section>
+
+      <section className="sidebar-section">
+        <h2>Colour licences by</h2>
+        <div className="segmented">
+          <button
+            type="button"
+            className={colorMode === "status" ? "segmented-btn active" : "segmented-btn"}
+            onClick={() => onColorModeChange("status")}
+          >
+            Status
+          </button>
+          <button
+            type="button"
+            className={colorMode === "operator" ? "segmented-btn active" : "segmented-btn"}
+            onClick={() => onColorModeChange("operator")}
+          >
+            Operator
+          </button>
+        </div>
+        {colorMode === "operator" && (
+          <div className="legend">
+            {facets.companies.map((op) => (
+              <div className="legend-row" key={op}>
+                <span className="legend-swatch" style={{ background: operatorColors.get(op) }} />
+                <span className="legend-label">{op}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="sidebar-section">

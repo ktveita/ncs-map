@@ -22,6 +22,8 @@ export interface LicenceProperties {
   licensees: Licensee[];
 }
 
+export type ColorMode = "status" | "operator";
+
 export interface LayerDef {
   id: string;
   label: string;

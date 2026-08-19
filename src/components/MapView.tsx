@@ -6,6 +6,8 @@ import type { LicenceProperties } from "../types";
 import { FACTMAPS_MAPSERVER } from "../api/sodirClient";
 import { CONTEXT_LAYERS } from "../layers";
 import { buildFilterExpression, type Filters } from "../filterExpression";
+import { UNKNOWN_OPERATOR_COLOR } from "../companyColors";
+import type { ColorMode } from "../types";
 
 const LICENCE_SOURCE = "licences";
 const LICENCE_FILL_LAYER = "licences-fill";
@@ -82,6 +84,15 @@ function refreshContextLayer(map: MLMap, layerId: string, layerIds: string) {
   }
 }
 
+const STATUS_COLOR_EXPRESSION = ["case", ["==", ["get", "active"], "Y"], "#1f7a8c", "#8a8a8a"];
+
+function colorExpression(colorMode: ColorMode, operatorColors: Map<string, string>): unknown {
+  if (colorMode === "status") return STATUS_COLOR_EXPRESSION;
+  if (operatorColors.size === 0) return UNKNOWN_OPERATOR_COLOR;
+  const pairs = [...operatorColors.entries()].flat();
+  return ["match", ["get", "operatorName"], ...pairs, UNKNOWN_OPERATOR_COLOR];
+}
+
 function formatDate(ms: number | null): string {
   if (!ms) return "—";
   return new Date(ms).toLocaleDateString("en-GB");
@@ -121,15 +132,21 @@ interface Props {
   licences: FeatureCollection<Polygon | MultiPolygon, LicenceProperties> | null;
   filters: Filters;
   activeContextLayers: Set<string>;
+  colorMode: ColorMode;
+  operatorColors: Map<string, string>;
 }
 
-export function MapView({ licences, filters, activeContextLayers }: Props) {
+export function MapView({ licences, filters, activeContextLayers, colorMode, operatorColors }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MLMap | null>(null);
   const popupRef = useRef<Popup | null>(null);
   const readyRef = useRef(false);
   const activeContextLayersRef = useRef(activeContextLayers);
   activeContextLayersRef.current = activeContextLayers;
+  const colorModeRef = useRef(colorMode);
+  colorModeRef.current = colorMode;
+  const operatorColorsRef = useRef(operatorColors);
+  operatorColorsRef.current = operatorColors;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -176,12 +193,13 @@ export function MapView({ licences, filters, activeContextLayers }: Props) {
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
       });
+      const initialColor = colorExpression(colorModeRef.current, operatorColorsRef.current);
       map.addLayer({
         id: LICENCE_FILL_LAYER,
         type: "fill",
         source: LICENCE_SOURCE,
         paint: {
-          "fill-color": ["case", ["==", ["get", "active"], "Y"], "#1f7a8c", "#8a8a8a"],
+          "fill-color": initialColor as any,
           "fill-opacity": 0.25,
         },
       });
@@ -190,7 +208,7 @@ export function MapView({ licences, filters, activeContextLayers }: Props) {
         type: "line",
         source: LICENCE_SOURCE,
         paint: {
-          "line-color": ["case", ["==", ["get", "active"], "Y"], "#1f7a8c", "#6b6b6b"],
+          "line-color": initialColor as any,
           "line-width": 1,
         },
       });
@@ -240,6 +258,15 @@ export function MapView({ licences, filters, activeContextLayers }: Props) {
     if (readyRef.current) apply();
     else map.once("load", apply);
   }, [licences]);
+
+  // Recolor licences by status or by operator.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !readyRef.current) return;
+    const expr = colorExpression(colorMode, operatorColors);
+    map.setPaintProperty(LICENCE_FILL_LAYER, "fill-color", expr as any);
+    map.setPaintProperty(LICENCE_LINE_LAYER, "line-color", expr as any);
+  }, [colorMode, operatorColors]);
 
   // Apply attribute filters.
   useEffect(() => {
