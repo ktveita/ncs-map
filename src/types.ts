@@ -20,6 +20,10 @@ export interface LicenceProperties {
   factPageUrl: string | null;
   licenseeNames: string[];
   licensees: Licensee[];
+  /** Latest Drill-or-Drop decision deadline from the licence's work programme, if any. */
+  drillOrDropDate: number | null;
+  drillOrDropYear: number | null;
+  drillOrDropStatus: string | null;
 }
 
 export type ColorMode = "status" | "operator" | "licensee";

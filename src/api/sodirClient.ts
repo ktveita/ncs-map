@@ -1,41 +1,15 @@
 import type { FeatureCollection, Polygon, MultiPolygon } from "geojson";
 import type { Licensee, LicenceProperties } from "../types";
+import { FACTMAPS_MAPSERVER, DATASERVICE_MAPSERVER, fetchAllPages } from "./arcgis";
 
-export const FACTMAPS_MAPSERVER =
-  "https://factmaps.sodir.no/api/rest/services/Factmaps/FactMapsWGS84/MapServer";
-export const DATASERVICE_MAPSERVER =
-  "https://factmaps.sodir.no/api/rest/services/DataService/Data/MapServer";
+export { FACTMAPS_MAPSERVER, DATASERVICE_MAPSERVER };
 
 /** Production licence, all - current with geometry */
 const LICENCE_LAYER = 616;
 /** petreg_licence_licensee: current licensees per licence with ownership share */
 const LICENSEE_TABLE = 3401;
-
-async function fetchAllPages<T>(
-  baseUrl: string,
-  layerId: number,
-  params: Record<string, string>,
-  pageSize: number,
-  extract: (json: any) => T[],
-): Promise<T[]> {
-  const out: T[] = [];
-  let offset = 0;
-  for (;;) {
-    const url = new URL(`${baseUrl}/${layerId}/query`);
-    Object.entries({ ...params, resultOffset: String(offset), resultRecordCount: String(pageSize) }).forEach(
-      ([k, v]) => url.searchParams.set(k, v),
-    );
-    const res = await fetch(url.toString());
-    if (!res.ok) throw new Error(`sodir API error ${res.status} on layer ${layerId}`);
-    const json = await res.json();
-    if (json.error) throw new Error(json.error.message ?? "sodir API error");
-    const page = extract(json);
-    out.push(...page);
-    if (page.length < pageSize) break;
-    offset += pageSize;
-  }
-  return out;
-}
+/** licence_task: work programme tasks/decisions per licence, incl. Drill-or-Drop (DOD) */
+const LICENCE_TASK_TABLE = 3010;
 
 async function fetchLicenseeRows(): Promise<any[]> {
   return fetchAllPages(
@@ -47,12 +21,37 @@ async function fetchLicenseeRows(): Promise<any[]> {
   );
 }
 
+interface DrillOrDrop {
+  date: number | null;
+  status: string | null;
+}
+
+/** Latest Drill-or-Drop decision task per licence (a licence can have more than one over its life). */
+async function fetchDrillOrDropByLicence(): Promise<Map<number, DrillOrDrop>> {
+  const rows = await fetchAllPages<any>(
+    DATASERVICE_MAPSERVER,
+    LICENCE_TASK_TABLE,
+    { where: "prlTaskTypeCode='DOD'", outFields: "prlNpdidLicence,prlTaskExpiryDate,prlTaskStatusEn", f: "json" },
+    2000,
+    (json: any) => (json.features ?? []).map((f: any) => f.attributes),
+  );
+  const byLicence = new Map<number, DrillOrDrop>();
+  for (const row of rows) {
+    if (row.prlNpdidLicence == null) continue;
+    const existing = byLicence.get(row.prlNpdidLicence);
+    if (!existing || (row.prlTaskExpiryDate ?? 0) > (existing.date ?? 0)) {
+      byLicence.set(row.prlNpdidLicence, { date: row.prlTaskExpiryDate, status: row.prlTaskStatusEn });
+    }
+  }
+  return byLicence;
+}
+
 /**
  * Loads all production licence polygons and joins in the full current licensee
  * list (all owners with their ownership share, not just the operator).
  */
 export async function loadLicences(): Promise<FeatureCollection<Polygon | MultiPolygon, LicenceProperties>> {
-  const [rawFeatures, licenseeRows] = await Promise.all([
+  const [rawFeatures, licenseeRows, drillOrDropByLicence] = await Promise.all([
     fetchAllPages(
       FACTMAPS_MAPSERVER,
       LICENCE_LAYER,
@@ -61,6 +60,7 @@ export async function loadLicences(): Promise<FeatureCollection<Polygon | MultiP
       (json: FeatureCollection) => json.features as any[],
     ),
     fetchLicenseeRows(),
+    fetchDrillOrDropByLicence(),
   ]);
 
   const licenseesByLicence = new Map<number, Licensee[]>();
@@ -80,6 +80,7 @@ export async function loadLicences(): Promise<FeatureCollection<Polygon | MultiP
     const licensees = (licenseesByLicence.get(p.prlNpdidLicence) ?? []).sort(
       (a, b) => (b.interestPct ?? 0) - (a.interestPct ?? 0),
     );
+    const drillOrDrop = drillOrDropByLicence.get(p.prlNpdidLicence);
     const properties: LicenceProperties = {
       npdId: p.prlNpdidLicence,
       name: p.prlName,
@@ -96,6 +97,9 @@ export async function loadLicences(): Promise<FeatureCollection<Polygon | MultiP
       factPageUrl: p.prlFactPageUrl,
       licenseeNames: licensees.map((l) => l.companyName).filter(Boolean),
       licensees,
+      drillOrDropDate: drillOrDrop?.date ?? null,
+      drillOrDropYear: drillOrDrop?.date != null ? new Date(drillOrDrop.date).getUTCFullYear() : null,
+      drillOrDropStatus: drillOrDrop?.status ?? null,
     };
     return { ...f, properties };
   });

@@ -9,6 +9,7 @@ interface Facets {
   statuses: string[];
   phases: string[];
   mainAreas: string[];
+  drillOrDropYears: string[];
 }
 
 interface Props {
@@ -149,6 +150,20 @@ export function Sidebar({
           selected={filters.mainAreas}
           onChange={(mainAreas) => onFiltersChange({ ...filters, mainAreas })}
         />
+        <MultiSelect
+          label="Drill-or-Drop year (pending)"
+          options={facets.drillOrDropYears}
+          selected={filters.drillOrDropYears}
+          onChange={(drillOrDropYears) => onFiltersChange({ ...filters, drillOrDropYears })}
+        />
+        <label className="option-row">
+          <input
+            type="checkbox"
+            checked={filters.drillDecisionTaken}
+            onChange={(e) => onFiltersChange({ ...filters, drillDecisionTaken: e.target.checked })}
+          />
+          <span>Drill decision taken</span>
+        </label>
         {hasActiveFilters(filters) && (
           <button type="button" className="reset-btn" onClick={() => onFiltersChange(EMPTY_FILTERS)}>
             Reset all filters

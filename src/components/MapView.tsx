@@ -148,6 +148,11 @@ function popupHtml(p: LicenceProperties): string {
         <tr><td>Area</td><td>${p.currentAreaKm2 ? p.currentAreaKm2.toFixed(1) + " km²" : "—"}</td></tr>
         <tr><td>Granted</td><td>${formatDate(p.dateGranted)}</td></tr>
         <tr><td>Valid to</td><td>${formatDate(p.dateValidTo)}</td></tr>
+        ${
+          p.drillOrDropDate
+            ? `<tr><td>Drill-or-Drop</td><td>${formatDate(p.drillOrDropDate)}${p.drillOrDropStatus ? ` (${p.drillOrDropStatus})` : ""}</td></tr>`
+            : ""
+        }
       </table>
       ${
         licenseeRows
