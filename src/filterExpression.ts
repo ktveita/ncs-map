@@ -10,7 +10,7 @@ export interface Filters {
   mainAreas: string[];
   /** Pending Drill-or-Drop decision year(s), as strings (e.g. "2026") to match MultiSelect's string options. */
   drillOrDropYears: string[];
-  /** Only licences where a drill decision has already been taken but not yet carried out. */
+  /** Only licences where a drill decision has already been taken but the committed well hasn't been drilled yet. */
   drillDecisionTaken: boolean;
 }
 
@@ -53,6 +53,7 @@ export function buildFilterExpression(filters: Filters): ExpressionSpecification
       ["get", "drillOrDropStatus"],
       DRILL_DECISION_TAKEN_STATUS,
     ] as unknown as ExpressionSpecification);
+    clauses.push(["==", ["get", "explorationWellDrilled"], false] as unknown as ExpressionSpecification);
   }
 
   if (clauses.length === 0) return null;
@@ -66,6 +67,7 @@ interface FilterableProps {
   mainArea: string | null;
   drillOrDropYear: number | null;
   drillOrDropStatus: string | null;
+  explorationWellDrilled: boolean;
 }
 
 export function matchesFilters(props: FilterableProps, filters: Filters): boolean {
@@ -78,7 +80,11 @@ export function matchesFilters(props: FilterableProps, filters: Filters): boolea
     (props.drillOrDropYear == null || !filters.drillOrDropYears.includes(String(props.drillOrDropYear)))
   )
     return false;
-  if (filters.drillDecisionTaken && props.drillOrDropStatus !== DRILL_DECISION_TAKEN_STATUS) return false;
+  if (
+    filters.drillDecisionTaken &&
+    (props.drillOrDropStatus !== DRILL_DECISION_TAKEN_STATUS || props.explorationWellDrilled)
+  )
+    return false;
   return true;
 }
 

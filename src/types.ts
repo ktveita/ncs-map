@@ -24,6 +24,10 @@ export interface LicenceProperties {
   drillOrDropDate: number | null;
   drillOrDropYear: number | null;
   drillOrDropStatus: string | null;
+  /** Wellbore name once the committed well has actually been drilled — null while still outstanding. */
+  drillOrDropWellbore: string | null;
+  /** Whether an exploration or appraisal wellbore has already been drilled in this licence. */
+  explorationWellDrilled: boolean;
 }
 
 export type ColorMode = "status" | "operator" | "licensee";
