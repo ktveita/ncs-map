@@ -204,10 +204,15 @@ export function MapView({
         sources: {
           basemap: {
             type: "raster",
-            tiles: ["https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"],
+            // Esri's classic World Light Gray Base — free, keyless, no signup, unlike
+            // CARTO's basemaps.cartocdn.com which now watermarks anonymous tiles
+            // with "API KEY REQUIRED" and needs a carto.com account to remove.
+            tiles: [
+              "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+            ],
             tileSize: 256,
             attribution:
-              '© <a href="https://carto.com/attributions">CARTO</a> © OpenStreetMap contributors · Licence data © <a href="https://www.sodir.no/">Norwegian Offshore Directorate</a> (NLOD)',
+              'Basemap © <a href="https://www.esri.com/">Esri</a> · Licence data © <a href="https://www.sodir.no/">Norwegian Offshore Directorate</a> (NLOD)',
           },
         },
         layers: [{ id: "basemap", type: "raster", source: "basemap" }],
